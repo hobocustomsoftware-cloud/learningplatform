@@ -1,0 +1,2 @@
+-keep class org.jitsi.** { *; }
+-keep class org.webrtc.** { *; }

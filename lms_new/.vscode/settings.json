@@ -1,0 +1,11 @@
+{
+    "cSpell.words": [
+        "allprojects",
+        "Jitsi",
+        "subprojects"
+    ],
+    "flutterTools.displayGetxContextMenu": false,
+    "flutterTools.displayMobxContextMenu": false,
+    "flutterTools.displayRiverpodContextMenu": true,
+    "flutterTools.displayModularContextMenu": false
+}
