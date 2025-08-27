@@ -3,13 +3,16 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 class IsInstructorOrAdmin(BasePermission):
     def has_permission(self, request, view):
-        if request.method in SAFE_METHODS:
-            return request.user and request.user.is_authenticated
-        # create/update/delete = instructor or admin only
-        return (
-            request.user and request.user.is_authenticated and
-            getattr(request.user, "role", "") in ("instructor", "admin")
-        )
+        # if request.method in SAFE_METHODS:
+        #     return request.user and request.user.is_authenticated
+        # # create/update/delete = instructor or admin only
+        # return (
+        #     request.user and request.user.is_authenticated and
+        #     getattr(request.user, "role", "") in ("instructor", "admin")
+        # )
+        u = request.user
+        role = getattr(u, "role", "student")
+        return role in ("instructor", "admin")
 
 class CanJoinLiveClass(BasePermission):
     """

@@ -13,7 +13,7 @@ def generate_jitsi_token(user, room_name, is_moderator=False):
         is_moderator: Boolean indicating if the user is a moderator (instructor/admin)
         
     Returns:
-        str: JWT token string
+        str | None: JWT token string or None if credentials are missing
     """
     # Get Jitsi configuration from settings
     jitsi_app_id = getattr(settings, 'JITSI_APP_ID', None)
@@ -49,4 +49,8 @@ def generate_jitsi_token(user, room_name, is_moderator=False):
     
     # Generate JWT token with HS256 algorithm
     token = jwt.encode(payload, jitsi_app_secret, algorithm='HS256')
-    return token
+    return 
+
+
+
+

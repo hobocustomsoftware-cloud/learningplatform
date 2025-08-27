@@ -11,6 +11,8 @@ class _NoRtc implements RtcClient {
     String? userName,
     String? userEmail,
     bool isHost = false,
+    String? serverUrl,
+    String? token,
   }) async {}
   @override
   Widget composedView() => const SizedBox.shrink();

@@ -234,3 +234,9 @@ CORS_ALLOWED_ORIGINS = [
 # Or loosen during dev:
 # CORS_ALLOW_ALL_ORIGINS = True
 
+
+
+#Agora
+
+AGORA_APP_ID   = os.environ.get("AGORA_APP_ID",    "ddf12d43c7f446aaaad63571b86f348d")
+AGORA_APP_CERT = os.environ.get("AGORA_APP_CERT",  "21509bc3f9eb4753857c83389329da24")

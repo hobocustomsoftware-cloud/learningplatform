@@ -8,6 +8,8 @@ abstract class RtcClient {
     String? userName,
     String? userEmail,
     bool isHost = false,
+    String? serverUrl,
+    String? token,
   });
   Widget composedView();
 

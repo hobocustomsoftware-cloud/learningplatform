@@ -25,15 +25,17 @@ class ApiEnv {
   static String ws(String path) => '$wsBase$path';
 
   // ---------- Jitsi ----------
-  static const String jitsiDomain = 'meet.jit.si'; // web IFrame
 
   /// Jitsi server URL - uses jitsiDomain for all platforms
-  // static String get jitsiServerUrl {
-  //   // Use the public Jitsi domain for all platforms
-  //   return 'https://meet.jit.si';
-  // }
+  //// Domain used for the web SDK/IFrame.
+  static const String jitsiDomain = 'meet.jit.si';
+
+  /// Full server URL used by the native SDKs.
+  static const String jitsiServerUrl = 'https://meet.jit.si';
 
   static const String userDisplayName = 'userDisplayName';
   static const String? userEmail = null;
   static const String? userAvatar = null;
+
+  static const String agoraAppId = "ddf12d43c7f446aaaad63571b86f348d";
 }

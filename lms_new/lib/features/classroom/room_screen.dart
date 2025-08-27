@@ -43,6 +43,8 @@ class _RoomScreenState extends State<RoomScreen> {
 
       final room = (payload['room'] as String?) ?? 'room-${widget.classId}';
       final subject = (payload['subject'] as String?) ?? widget.title;
+      final serverUrl = payload['jitsi_server_url'] as String?;
+      final token = payload['token'] as String?;
 
       // Get user information
       final userName = await UsersApi.instance.myName();
@@ -54,6 +56,8 @@ class _RoomScreenState extends State<RoomScreen> {
         userName: userName,
         userEmail: userEmail,
         isHost: widget.isHost,
+        serverUrl: serverUrl,
+        token: token,
       );
     } catch (e) {
       _err = e.toString();

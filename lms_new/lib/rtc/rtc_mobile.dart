@@ -1,73 +1,47 @@
-import 'package:flutter/material.dart';
-import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import '../core/api_env.dart';
-import 'rtc_client.dart';
 
-class MobileRtcClient implements RtcClient {
-  final _jitsi = JitsiMeet();
-  bool _audioMuted = false;
-  bool _videoMuted = false;
-  bool isHost = false;
-  @override
+class MobileRtcClient {
+  RtcEngine? _engine;
+
   Future<void> init({
     required String roomName,
-    required String subject,
-    required bool isHost, // signature must match interface
+    required String token,
+    required int uid,
+    bool isHost = false,
   }) async {
-    final opts = JitsiMeetConferenceOptions(
-      room: roomName,
-      serverURL: ApiEnv.jitsiDomain,
-      userInfo: JitsiMeetUserInfo(
-        displayName: ApiEnv.userDisplayName,
-        email: ApiEnv.userEmail,
-        avatar: ApiEnv.userAvatar,
+    _engine = createAgoraRtcEngine();
+    await _engine!.initialize(const RtcEngineContext(appId: ApiEnv.agoraAppId));
+
+    _engine!.registerEventHandler(
+      RtcEngineEventHandler(
+        onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+          print("✅ Mobile joined: ${connection.channelId}");
+        },
+        onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+          print("👤 Mobile user joined: $remoteUid");
+        },
       ),
-      configOverrides: {
-        "subject": subject,
-        "prejoinPageEnabled": true,
-        "startWithAudioMuted": _audioMuted,
-        "startWithVideoMuted": _videoMuted,
-      },
-      featureFlags: {"lobby-mode.enabled": false},
     );
 
-    await _jitsi.join(
-      opts,
-      listener: JitsiMeetEventListener(
-        // ❗ some builds don’t expose onOpened → leave it out if it reds
-        // onOpened: () => debugPrint("Mobile onOpened"),
-        conferenceJoined: (url) => debugPrint("Mobile joined: $url"),
-        conferenceTerminated: (url, error) =>
-            debugPrint("Mobile terminated: $url, error: $error"),
-        readyToClose: () => debugPrint("Mobile readyToClose"),
-        participantJoined: (email, name, role, participantId) =>
-            debugPrint("Mobile participantJoined: $name ($participantId)"),
-        onError: (err) => debugPrint("Mobile onError: $err"),
-      ),
+    await _engine!.enableVideo();
+
+    await _engine!.setClientRole(
+      role: isHost
+          ? ClientRoleType.clientRoleBroadcaster
+          : ClientRoleType.clientRoleAudience,
+    );
+
+    await _engine!.joinChannel(
+      token: token,
+      channelId: roomName,
+      uid: uid,
+      options: const ChannelMediaOptions(),
     );
   }
 
-  @override
-  Widget composedView() => const Center(child: Text('Connected (mobile)'));
-
-  @override
-  Future<void> toggleMic() async {
-    _audioMuted = !_audioMuted;
-    await _jitsi.setAudioMuted(_audioMuted);
+  Future<void> leave() async {
+    await _engine?.leaveChannel();
+    await _engine?.release();
   }
-
-  @override
-  Future<void> toggleCam() async {
-    _videoMuted = !_videoMuted;
-    await _jitsi.setVideoMuted(_videoMuted);
-  }
-
-  @override
-  Future<void> toggleCamera() => _jitsi.switchCamera();
-
-  @override
-  Future<void> leave() => _jitsi.hangUp();
-
-  @override
-  void dispose() {}
 }

@@ -7,7 +7,7 @@ class LiveClassSerializer(serializers.ModelSerializer):
     class Meta: # type: ignore
         model = LiveClass
         fields = "__all__"
-        # read_only_fields = ['id','room_name','instructor']
+        read_only_fields = ["id", "is_live"]
 
     def create(self, validated_data):
         # optional: if room not provided, generate one
