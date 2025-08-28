@@ -8,6 +8,7 @@ class EnrollmentsApi {
 
   /// Backend current contract:
   /// POST /api/enrollments/enroll/
+  // ignore: unintended_html_in_doc_comment
   /// body = { "course": <id>, "course_id": <id> }
   Future<void> enroll(int courseId) async {
     final dio = DioClient.i().dio;

@@ -1,123 +1,167 @@
 // lib/features/classroom/room_screen.dart
 import 'package:flutter/material.dart';
+
 import '../../api/classroom_api.dart';
-import '../../api/users_api.dart';
-import '../../rtc/rtc_selector.dart'; // ✅ makeRtcClient() ရှိတဲ့ ဖိုင်
+import '../../model/join_info.dart'; // ⬅️ JoinInfo.fromMap() here
+import '../../rtc/rtc_client.dart'; // ⬅️ use RtcClient.make()
 
 class RoomScreen extends StatefulWidget {
   const RoomScreen({
     super.key,
     required this.classId,
-    required this.isHost, // <- prop နာမည်က isHost
     required this.title,
+    required this.isHost,
   });
-
   final int classId;
-  final bool isHost;
   final String title;
+  final bool isHost;
 
   @override
   State<RoomScreen> createState() => _RoomScreenState();
 }
 
 class _RoomScreenState extends State<RoomScreen> {
-  final _rtc = makeRtcClient(); // ✅ RtcClient.make() မဟုတ်ဘူး
-  bool _initing = true;
+  late final RtcClient _rtc;
+  bool _loading = true;
   String? _err;
 
   @override
   void initState() {
     super.initState();
+    // ✅ single factory (selector/as imports မလို)
+    _rtc = RtcClient.make();
     _boot();
   }
 
   Future<void> _boot() async {
     setState(() {
-      _initing = true;
+      _loading = true;
       _err = null;
     });
+
     try {
-      final payload = widget.isHost
-          ? await ClassroomApi.instance.start(widget.classId)
-          : await ClassroomApi.instance.join(widget.classId);
+      Map<String, dynamic> raw;
 
-      final room = (payload['room'] as String?) ?? 'room-${widget.classId}';
-      final subject = (payload['subject'] as String?) ?? widget.title;
-      final serverUrl = payload['jitsi_server_url'] as String?;
-      final token = payload['token'] as String?;
+      if (widget.isHost) {
+        // Host ကိုပဲ start ခေါ်မယ်—မရရင် (403/500) join ကို fallback
+        try {
+          raw = await ClassroomApi.instance.start(widget.classId);
+        } catch (_) {
+          raw = await ClassroomApi.instance.join(widget.classId);
+        }
+      } else {
+        // Student は 常に join
+        raw = await ClassroomApi.instance.join(widget.classId);
+      }
 
-      // Get user information
-      final userName = await UsersApi.instance.myName();
-      final userEmail = await UsersApi.instance.myEmail();
+      final info = JoinInfo.fromMap(raw);
 
       await _rtc.init(
-        roomName: room,
-        subject: subject,
-        userName: userName,
-        userEmail: userEmail,
-        isHost: widget.isHost,
-        serverUrl: serverUrl,
-        token: token,
+        channel: info.channel,
+        appId: info.appId,
+        token: info.token,
+        uid: info.uid,
+        isHost: info.isHost, // backend ကမှန်ကန်စွာ is_host ပြန်ပေးတယ်
       );
+
+      if (!mounted) return;
+      setState(() => _loading = false);
     } catch (e) {
-      _err = e.toString();
-    } finally {
-      if (mounted) setState(() => _initing = false);
+      if (!mounted) return;
+      setState(() {
+        _err = e.toString();
+        _loading = false;
+      });
     }
   }
 
   @override
   void dispose() {
+    // dispose() မှာ await မလုပ်ပါ
+    _rtc.leave();
     _rtc.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_initing) {
+    if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Connecting...')),
+        appBar: AppBar(title: Text(widget.title)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
+
     if (_err != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Meeting')),
+        appBar: AppBar(title: Text(widget.title)),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_err!, textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _boot, child: const Text('Retry')),
+              Text(_err!, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 8),
+              OutlinedButton(onPressed: _boot, child: const Text('Retry')),
             ],
           ),
         ),
       );
     }
+
+    final controls = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton.filledTonal(
+          onPressed: () {
+            _rtc.toggleMic();
+          }, // ⬅️ wrap Future<void>
+          icon: const Icon(Icons.mic),
+          tooltip: 'Mic',
+        ),
+        const SizedBox(width: 12),
+        IconButton.filledTonal(
+          onPressed: () {
+            _rtc.toggleCam();
+          }, // ⬅️ wrap Future<void>
+          icon: const Icon(Icons.videocam),
+          tooltip: 'Camera',
+        ),
+        const SizedBox(width: 12),
+        IconButton.filledTonal(
+          onPressed: () {
+            _rtc.switchCamera();
+          }, // ⬅️ wrap Future<void>
+          icon: const Icon(Icons.cameraswitch),
+          tooltip: 'Switch camera',
+        ),
+        const SizedBox(width: 12),
+        IconButton.filled(
+          style: IconButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () async {
+            await _rtc.leave();
+            if (mounted) Navigator.pop(context);
+          },
+          icon: const Icon(Icons.call_end),
+          tooltip: 'Leave',
+        ),
+      ],
+    );
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          IconButton(icon: const Icon(Icons.mic), onPressed: _rtc.toggleMic),
-          IconButton(
-            icon: const Icon(Icons.videocam),
-            onPressed: _rtc.toggleCam,
-          ),
-          IconButton(
-            icon: const Icon(Icons.switch_camera),
-            onPressed: _rtc.toggleCamera,
-          ),
-          IconButton(
-            icon: const Icon(Icons.call_end),
-            onPressed: () async {
-              await _rtc.leave();
-              if (mounted) Navigator.pop(context);
-            },
+      appBar: AppBar(title: Text(widget.title)),
+      body: Column(
+        children: [
+          // Agora renders into platform views (web/mobile)
+          Expanded(child: _rtc.composedView()),
+          const SizedBox(height: 8),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: controls,
+            ),
           ),
         ],
       ),
-      body: _rtc.composedView(),
     );
   }
 }

@@ -71,8 +71,8 @@ class _ClassroomPageState extends State<ClassroomPage> {
                     MaterialPageRoute(
                       builder: (_) => RoomScreen(
                         classId: widget.classId,
-                        title: 'Class #${widget.classId}',
-                        isHost: isHost,
+                        title: 'title',
+                        isHost: isHost, // ✅
                       ),
                     ),
                   );

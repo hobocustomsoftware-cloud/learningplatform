@@ -38,6 +38,17 @@ class ClassroomApi {
     return LiveClass.fromMap(Map<String, dynamic>.from(r.data as Map));
   }
 
+  Future<Map<String, dynamic>> getJoinInfo(
+    int id, {
+    required bool asHost,
+  }) async {
+    final url = asHost
+        ? ApiEnv.api('/classroom/live-classes/$id/start/')
+        : ApiEnv.api('/classroom/live-classes/$id/join/');
+    final r = await DioClient.i().dio.post(url);
+    return Map<String, dynamic>.from(r.data as Map);
+  }
+
   Future<Map<String, dynamic>> start(int id) async {
     final url = ApiEnv.api('/classroom/live-classes/$id/start/');
     final r = await DioClient.i().dio.post(url);

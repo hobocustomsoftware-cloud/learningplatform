@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 class ApiEnv {
   // BACKEND_BASE ကို --dart-define နဲ့ override လို့ရအောင်
   static const String _kBackendBaseOverride = String.fromEnvironment(

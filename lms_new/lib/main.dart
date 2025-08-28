@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import 'core/dio_client.dart';
 import 'features/home/homepage.dart';
 import 'features/courses/course_detail_page.dart';
 import 'features/classroom/classroom_list_page.dart';

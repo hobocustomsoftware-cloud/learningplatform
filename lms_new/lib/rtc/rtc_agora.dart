@@ -1,116 +1,155 @@
 // lib/rtc/rtc_agora.dart
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
-import '../core/api_env.dart';
 import 'rtc_client.dart';
 
 class AgoraRtcClient implements RtcClient {
-  RtcEngine? _engine;
-  bool _audioMuted = false;
-  bool _videoMuted = false;
-  bool _joined = false;
+  final _remoteUids = <int>{};
+  final _uidsStream = StreamController<Set<int>>.broadcast();
+  late final RtcEngine _engine;
+  bool _micMuted = false, _camMuted = false;
+  int? _uid;
+  String? _channel;
 
   @override
   Future<void> init({
-    required String roomName, // channelName
-    required String subject,
-    String? userName,
-    String? userEmail,
-    bool isHost = false,
-    String? serverUrl, // unused for Agora
-    String? token,
-    int? uid,
+    required String channel,
+    required String appId,
+    required String token,
+    required int uid,
+    required bool isHost,
   }) async {
-    // 1) Initialize engine
-    _engine = createAgoraRtcEngine();
-    await _engine!.initialize(RtcEngineContext(appId: ApiEnv.agoraAppId));
+    _uid = uid;
+    _channel = channel;
 
-    // 2) Event handlers (debug)
-    _engine!.registerEventHandler(
+    _engine = createAgoraRtcEngine();
+    await _engine.initialize(RtcEngineContext(appId: appId));
+
+    _engine.registerEventHandler(
       RtcEngineEventHandler(
-        onJoinChannelSuccess: (connection, elapsed) {
-          debugPrint("Agora joined: ${connection.channelId}");
-          _joined = true;
+        onJoinChannelSuccess: (RtcConnection c, int elapsed) {
+          debugPrint('Agora joined: ${c.channelId}');
         },
-        onUserJoined: (connection, remoteUid, elapsed) {
-          debugPrint("Remote joined: $remoteUid");
+        onUserJoined: (RtcConnection c, int remoteUid, int elapsed) {
+          _remoteUids.add(remoteUid);
+          _uidsStream.add({..._remoteUids});
         },
-        onUserOffline: (connection, remoteUid, reason) {
-          debugPrint("Remote offline: $remoteUid, reason: $reason");
-        },
-        onError: (err, msg) {
-          debugPrint("Agora error: $err, $msg");
+        onUserOffline:
+            (RtcConnection c, int remoteUid, UserOfflineReasonType r) {
+              _remoteUids.remove(remoteUid);
+              _uidsStream.add({..._remoteUids});
+            },
+        onError: (ErrorCodeType code, String msg) {
+          debugPrint('Agora error: $code $msg');
         },
       ),
     );
 
-    // 3) Role set
-    await _engine!.setClientRole(
+    await _engine.enableVideo();
+
+    // role
+    await _engine.setClientRole(
       role: isHost
           ? ClientRoleType.clientRoleBroadcaster
           : ClientRoleType.clientRoleAudience,
     );
 
-    // 4) Enable video
-    await _engine!.enableVideo();
-
-    // 5) Mobile camera/mic permissions
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-      // permission_handler ကို သင့် project style အလိုက် ခေါ်ပါ
-      // await Permission.camera.request();
-      // await Permission.microphone.request();
-    }
-
-    // 6) Join channel
-    await _engine!.joinChannel(
-      token: token ?? "",
-      channelId: roomName,
-      uid: uid ?? 0, // zero = let SDK pick
-      options: const ChannelMediaOptions(),
+    // Host publish his tracks, audience subscribe only
+    final opts = ChannelMediaOptions(
+      publishCameraTrack: isHost,
+      publishMicrophoneTrack: isHost,
+      autoSubscribeAudio: true,
+      autoSubscribeVideo: true,
     );
 
-    // Host only: start preview & publish local stream
     if (isHost) {
-      await _engine!.startPreview();
+      await _engine.startPreview();
     }
+
+    await _engine.joinChannel(
+      token: token,
+      channelId: channel,
+      uid: uid,
+      options: opts,
+    );
   }
 
+  // A simple composed view: local on top-left (if host), remotes in a grid.
   @override
   Widget composedView() {
-    // Minimal: show a note (for web you usually embed views via SurfaceView etc. — PoC skips)
-    return Center(child: Text(_joined ? 'Connected (Agora)' : 'Connecting…'));
-    // production: use AgoraVideoView for local/remote
+    return StreamBuilder<Set<int>>(
+      stream: _uidsStream.stream,
+      initialData: const {},
+      builder: (_, snap) {
+        final remotes = snap.data!.toList();
+        final tiles = <Widget>[];
+
+        // local view (only for host/broadcaster)
+        tiles.add(
+          Container(
+            color: Colors.black,
+            child: AgoraVideoView(
+              controller: VideoViewController(
+                rtcEngine: _engine,
+                canvas: const VideoCanvas(uid: 0), // local
+              ),
+            ),
+          ),
+        );
+
+        // remote views
+        for (final uid in remotes) {
+          tiles.add(
+            Container(
+              color: Colors.black,
+              child: AgoraVideoView(
+                controller: VideoViewController.remote(
+                  rtcEngine: _engine,
+                  canvas: VideoCanvas(uid: uid),
+                  connection: RtcConnection(channelId: _channel),
+                ),
+              ),
+            ),
+          );
+        }
+
+        // simple grid
+        final cross = tiles.length <= 2 ? 1 : 2;
+        return GridView.count(
+          crossAxisCount: cross,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          children: tiles,
+        );
+      },
+    );
   }
 
   @override
   Future<void> toggleMic() async {
-    _audioMuted = !_audioMuted;
-    await _engine?.muteLocalAudioStream(_audioMuted);
+    _micMuted = !_micMuted;
+    await _engine.muteLocalAudioStream(_micMuted);
   }
 
   @override
   Future<void> toggleCam() async {
-    _videoMuted = !_videoMuted;
-    await _engine?.muteLocalVideoStream(_videoMuted);
+    _camMuted = !_camMuted;
+    await _engine.muteLocalVideoStream(_camMuted);
   }
 
-  // Mobile သာ switch camera ရနိုင်
   @override
-  Future<void> toggleCamera() async {
-    await _engine?.switchCamera();
-  }
+  Future<void> switchCamera() => _engine.switchCamera();
 
   @override
   Future<void> leave() async {
-    await _engine?.leaveChannel();
-    _joined = false;
+    await _engine.leaveChannel();
+    await _engine.stopPreview();
   }
 
   @override
   void dispose() {
-    _engine?.release();
-    _engine = null;
+    _uidsStream.close();
+    _engine.release();
   }
 }

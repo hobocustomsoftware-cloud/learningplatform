@@ -1,24 +1,25 @@
 // lib/rtc/rtc_client.dart
 import 'package:flutter/widgets.dart';
+import 'rtc_selector.dart' show makeRtcClient;
 
 abstract class RtcClient {
   Future<void> init({
-    required String roomName,
-    required String subject,
-    String? userName,
-    String? userEmail,
-    bool isHost = false,
-    String? serverUrl,
-    String? token,
+    // Agora standard
+    required String channel,
+    required String appId,
+    required String token,
+    required int uid,
+    required bool isHost,
   });
+
   Widget composedView();
 
   Future<void> toggleMic();
   Future<void> toggleCam();
-
-  /// mobile မှာသာ camera ပြောင်းမယ်; web မှာ no-op လုပ်ပေးမယ်
-  Future<void> toggleCamera();
-
+  Future<void> switchCamera();
   Future<void> leave();
   void dispose();
+
+  // ✅ single factory entry
+  static RtcClient make() => makeRtcClient();
 }

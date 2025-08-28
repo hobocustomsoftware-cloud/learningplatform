@@ -1,6 +1,5 @@
 // lib/core/env_web.dart
 // @JS('window')
-external dynamic get _window;
 
 String _envOrNull(String key) {
   try {

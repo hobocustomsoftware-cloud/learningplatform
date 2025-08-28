@@ -16,6 +16,12 @@ class LiveClass(models.Model):
     ended_at = models.DateTimeField(null=True, blank=True)
     is_live = models.BooleanField(default=False)
 
+    @property
+    def channel_name(self) -> str:
+        # course FK ရှိရင် Django က auto သတ်မှတ်တဲ့ course_id ကိုသုံးနိုင်ပါတယ်
+        cid = getattr(self, 'course_id', None) or (self.course.id if self.course else 'x')
+        return f"lms_course{cid}_class{self.pk}"
+
     def generate_unique_room_name(self):
         """Generate a unique room name using course ID and random string"""
         # Use course ID in the room name if available
